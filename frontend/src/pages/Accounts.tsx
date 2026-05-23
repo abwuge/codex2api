@@ -2779,11 +2779,6 @@ export default function Accounts() {
                                     AT
                                   </span>
                                 )}
-                                {account.has_session_token && (
-                                  <span className="ml-1.5 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-950 dark:text-blue-400 dark:ring-blue-400/20">
-                                    ST
-                                  </span>
-                                )}
                                 {account.openai_responses_api && (
                                   <span className="ml-1.5 inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950 dark:text-emerald-400 dark:ring-emerald-400/20">
                                     Responses API
@@ -2996,14 +2991,12 @@ export default function Accounts() {
                                     className="h-7 w-8 px-0"
                                     disabled={
                                       authJsonExportingIds.has(account.id) ||
-                                      account.at_only ||
                                       account.openai_responses_api
                                     }
                                     onClick={() =>
                                       void handleGenerateAuthJSON(account)
                                     }
                                     title={
-                                      account.at_only ||
                                       account.openai_responses_api
                                         ? t("accounts.authJsonDisabled")
                                         : t("accounts.generateAuthJson")
@@ -3950,6 +3943,14 @@ export default function Accounts() {
                     {t("accounts.schedulerEditDesc", {
                       plan: editingAccount.plan_type || "-",
                     })}
+                  </div>
+                  <div className="mt-2 text-xs">
+                    <span className="text-muted-foreground">
+                      {t("accounts.credentialType")}:
+                    </span>{" "}
+                    <span className="font-semibold text-foreground">
+                      {getCredentialTypeLabel(editingAccount)}
+                    </span>
                   </div>
                 </div>
 
@@ -5031,6 +5032,17 @@ function canRefreshAccount(account: AccountRow): boolean {
     return Boolean(account.has_refresh_token || account.has_session_token);
   }
   return !account.at_only;
+}
+
+function getCredentialTypeLabel(account: AccountRow): string {
+  if (account.openai_responses_api) return "Responses API";
+  const hasRT = Boolean(account.has_refresh_token);
+  const hasST = Boolean(account.has_session_token);
+  if (hasRT && hasST) return "RT / ST";
+  if (hasRT) return "RT";
+  if (hasST) return "ST";
+  if (account.at_only) return "AT";
+  return "-";
 }
 
 // OpenAI reports the $100 Pro tier as "prolite" — functionally a Pro plan with

@@ -378,6 +378,93 @@ func TestGetAccountAuthJSONReturnsCodexAuthFile(t *testing.T) {
 	}
 }
 
+func TestGetAccountAuthJSONReturnsATOnlyWithEmptyRefreshToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestAdminDB(t)
+	accountID, err := db.InsertATAccount(context.Background(), "at-account", "access_at", "")
+	if err != nil {
+		t.Fatalf("insert at account: %v", err)
+	}
+	if err := db.UpdateCredentials(context.Background(), accountID, map[string]interface{}{
+		"account_id": "account_at",
+	}); err != nil {
+		t.Fatalf("seed credentials: %v", err)
+	}
+	handler := &Handler{db: db}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", accountID)}}
+	ctx.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/admin/accounts/%d/auth-json", accountID), nil)
+
+	handler.GetAccountAuthJSON(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var payload accountAuthJSON
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Tokens.AccessToken != "access_at" {
+		t.Fatalf("access_token = %q, want access_at", payload.Tokens.AccessToken)
+	}
+	if payload.Tokens.RefreshToken != "" {
+		t.Fatalf("refresh_token = %q, want empty", payload.Tokens.RefreshToken)
+	}
+	if payload.Tokens.IDToken != "access_at" {
+		t.Fatalf("id_token = %q, want access_at fallback", payload.Tokens.IDToken)
+	}
+	if payload.Tokens.AccountID != "account_at" {
+		t.Fatalf("account_id = %q, want account_at", payload.Tokens.AccountID)
+	}
+}
+
+func TestGetAccountAuthJSONReturnsSessionTokenAccountWithEmptyRefreshToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestAdminDB(t)
+	accountID, err := db.InsertAccountWithCredentials(context.Background(), "st-account", map[string]interface{}{
+		"session_token": "st_value",
+		"access_token":  "access_st",
+		"account_id":    "account_st",
+	}, "")
+	if err != nil {
+		t.Fatalf("insert st account: %v", err)
+	}
+	handler := &Handler{db: db}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", accountID)}}
+	ctx.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/admin/accounts/%d/auth-json", accountID), nil)
+
+	handler.GetAccountAuthJSON(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var payload accountAuthJSON
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Tokens.AccessToken != "access_st" {
+		t.Fatalf("access_token = %q, want access_st", payload.Tokens.AccessToken)
+	}
+	if payload.Tokens.RefreshToken != "" {
+		t.Fatalf("refresh_token = %q, want empty", payload.Tokens.RefreshToken)
+	}
+	if payload.Tokens.IDToken != "access_st" {
+		t.Fatalf("id_token = %q, want access_st fallback", payload.Tokens.IDToken)
+	}
+	if payload.Tokens.AccountID != "account_st" {
+		t.Fatalf("account_id = %q, want account_st", payload.Tokens.AccountID)
+	}
+}
+
 func TestGetAccountAuthJSONRejectsIncompleteTokens(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -395,7 +482,7 @@ func TestGetAccountAuthJSONRejectsIncompleteTokens(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	assertErrorMessage(t, recorder, "账号缺少 access_token 或 id_token，请先刷新账号后再生成 auth.json")
+	assertErrorMessage(t, recorder, "账号缺少 access_token，请先刷新账号后再生成 auth.json")
 }
 
 func TestGetUsageLogsRejectsInvalidAPIKeyID(t *testing.T) {

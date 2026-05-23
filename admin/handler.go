@@ -4624,23 +4624,24 @@ func (h *Handler) GetAccountAuthJSON(c *gin.Context) {
 	accessToken := row.GetCredential("access_token")
 	idToken := row.GetCredential("id_token")
 	accountID := row.GetCredential("account_id")
-	if refreshToken == "" {
-		writeError(c, http.StatusBadRequest, "该账号没有 refresh_token，无法生成 auth.json")
-		return
-	}
-	if accessToken == "" || idToken == "" {
-		writeError(c, http.StatusBadRequest, "账号缺少 access_token 或 id_token，请先刷新账号后再生成 auth.json")
+	if accessToken == "" {
+		writeError(c, http.StatusBadRequest, "账号缺少 access_token，请先刷新账号后再生成 auth.json")
 		return
 	}
 	if accountID == "" {
-		if info := auth.ParseIDToken(idToken); info != nil {
-			accountID = info.ChatGPTAccountID
+		if idToken != "" {
+			if info := auth.ParseIDToken(idToken); info != nil {
+				accountID = info.ChatGPTAccountID
+			}
 		}
 	}
 	if accountID == "" {
 		if info := auth.ParseAccessToken(accessToken); info != nil {
 			accountID = info.ChatGPTAccountID
 		}
+	}
+	if idToken == "" {
+		idToken = accessToken
 	}
 	if accountID == "" {
 		writeError(c, http.StatusBadRequest, "账号缺少 account_id，请先刷新账号后再生成 auth.json")
