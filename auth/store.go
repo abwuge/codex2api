@@ -983,7 +983,7 @@ func (a *Account) RuntimeStatus() string {
 		if a.hasDispatchCredentialLocked() {
 			return "active" // 冷却过期，已恢复
 		}
-		if a.RefreshToken != "" {
+		if a.RefreshToken != "" || a.SessionToken != "" {
 			return "refreshing"
 		}
 		return "error"
@@ -991,7 +991,7 @@ func (a *Account) RuntimeStatus() string {
 		if a.hasDispatchCredentialLocked() {
 			return "active"
 		}
-		if a.RefreshToken != "" && a.ErrorMsg == "" {
+		if (a.RefreshToken != "" || a.SessionToken != "") && a.ErrorMsg == "" {
 			return "refreshing"
 		}
 		return "error"
@@ -4303,11 +4303,11 @@ func (s *Store) parallelRefreshAll(ctx context.Context) {
 		if acc.HasActiveCooldown() {
 			continue
 		}
-		// AT-only 账号无 RT，无法刷新
+		// AT-only 账号无可刷新凭据，无法刷新
 		acc.mu.RLock()
-		hasRT := acc.RefreshToken != ""
+		hasRefreshCredential := acc.RefreshToken != "" || acc.SessionToken != ""
 		acc.mu.RUnlock()
-		if !hasRT {
+		if !hasRefreshCredential {
 			continue
 		}
 		if !acc.NeedsRefresh() {

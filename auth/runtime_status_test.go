@@ -13,6 +13,17 @@ func TestRuntimeStatusShowsRefreshingForRTWithoutAccessToken(t *testing.T) {
 	}
 }
 
+func TestRuntimeStatusShowsRefreshingForSTWithoutAccessToken(t *testing.T) {
+	acc := &Account{
+		SessionToken: "st-test",
+		Status:       StatusReady,
+	}
+
+	if got := acc.RuntimeStatus(); got != "refreshing" {
+		t.Fatalf("RuntimeStatus() = %q, want refreshing", got)
+	}
+}
+
 func TestRuntimeStatusKeepsErrorForFailedRTAccount(t *testing.T) {
 	acc := &Account{
 		RefreshToken: "rt-test",

@@ -923,6 +923,60 @@ func TestExportAccountsSkipsAccountsWithoutCredentials(t *testing.T) {
 	}
 }
 
+func TestListAccountsDoesNotMarkSessionTokenAccountAsATOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestAdminDB(t)
+	id, err := db.InsertAccountWithCredentials(context.Background(), "session-account", map[string]interface{}{
+		"session_token": "st_session",
+		"access_token":  "at_from_session",
+	}, "")
+	if err != nil {
+		t.Fatalf("insert session account: %v", err)
+	}
+	store := auth.NewStore(db, nil, &database.SystemSettings{
+		MaxConcurrency:                   2,
+		TestConcurrency:                  1,
+		TestModel:                        "gpt-5.4",
+		BackgroundRefreshIntervalMinutes: 2,
+		UsageProbeMaxAgeMinutes:          10,
+		RecoveryProbeIntervalMinutes:     30,
+		LazyMode:                         true,
+	})
+	handler := &Handler{db: db, store: store}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/admin/accounts", nil)
+
+	handler.ListAccounts(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+
+	var payload accountsResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(payload.Accounts) != 1 {
+		t.Fatalf("got %d accounts, want 1", len(payload.Accounts))
+	}
+	account := payload.Accounts[0]
+	if account.ID != id {
+		t.Fatalf("account id = %d, want %d", account.ID, id)
+	}
+	if account.ATOnly {
+		t.Fatal("session-token account with refreshed AT should not be marked AT-only")
+	}
+	if !account.HasSessionToken {
+		t.Fatal("HasSessionToken = false, want true")
+	}
+	if account.HasRefreshToken {
+		t.Fatal("HasRefreshToken = true, want false")
+	}
+}
+
 func newTestAdminDB(t *testing.T) *database.DB {
 	t.Helper()
 

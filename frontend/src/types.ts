@@ -30,6 +30,8 @@ export interface AccountRow {
   status: AccountStatus
   error_message?: string
   at_only?: boolean
+  has_refresh_token?: boolean
+  has_session_token?: boolean
   account_type?: string
   openai_responses_api?: boolean
   base_url?: string

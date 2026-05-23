@@ -2779,6 +2779,11 @@ export default function Accounts() {
                                     AT
                                   </span>
                                 )}
+                                {account.has_session_token && (
+                                  <span className="ml-1.5 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-950 dark:text-blue-400 dark:ring-blue-400/20">
+                                    ST
+                                  </span>
+                                )}
                                 {account.openai_responses_api && (
                                   <span className="ml-1.5 inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950 dark:text-emerald-400 dark:ring-emerald-400/20">
                                     Responses API
@@ -2972,15 +2977,13 @@ export default function Accounts() {
                                     className="h-7 w-8 px-0"
                                     disabled={
                                       refreshingIds.has(account.id) ||
-                                      account.at_only ||
-                                      account.openai_responses_api
+                                      !canRefreshAccount(account)
                                     }
                                     onClick={() => void handleRefresh(account)}
                                     title={
-                                      account.at_only ||
-                                      account.openai_responses_api
-                                        ? t("accounts.atRefreshDisabled")
-                                        : t("accounts.refreshAccessToken")
+                                      canRefreshAccount(account)
+                                        ? t("accounts.refreshAccessToken")
+                                        : t("accounts.atRefreshDisabled")
                                     }
                                   >
                                     <RefreshCw
@@ -5017,6 +5020,17 @@ function parseIntegerInput(value: string): number | null {
 
 function getDispatchScore(account: AccountRow): number {
   return account.dispatch_score ?? account.scheduler_score ?? 0;
+}
+
+function canRefreshAccount(account: AccountRow): boolean {
+  if (account.openai_responses_api) return false;
+  if (
+    typeof account.has_refresh_token === "boolean" ||
+    typeof account.has_session_token === "boolean"
+  ) {
+    return Boolean(account.has_refresh_token || account.has_session_token);
+  }
+  return !account.at_only;
 }
 
 // OpenAI reports the $100 Pro tier as "prolite" — functionally a Pro plan with

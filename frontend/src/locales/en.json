@@ -539,7 +539,7 @@
     "dropHint": "Supports .txt, .json files and folders",
     "unsupportedFileType": "Unsupported file type: {{name}}. Only .txt and .json are supported",
     "atWarning": "AT-only accounts cannot auto-refresh. You will need to manually update the token after it expires.",
-    "atRefreshDisabled": "AT accounts cannot be refreshed",
+    "atRefreshDisabled": "This account has no refreshable credential",
     "generateAuthJson": "Generate auth.json",
     "authJsonGenerated": "auth.json generated. Choose copy or export.",
     "authJsonFailed": "Failed to generate auth.json: {{error}}",

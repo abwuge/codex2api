@@ -395,6 +395,8 @@ type accountResponse struct {
 	Status                   string                     `json:"status"`
 	ErrorMessage             string                     `json:"error_message,omitempty"`
 	ATOnly                   bool                       `json:"at_only"`
+	HasRefreshToken          bool                       `json:"has_refresh_token"`
+	HasSessionToken          bool                       `json:"has_session_token"`
 	CreditEnabled            bool                       `json:"credit_enabled"`
 	CreditSkipUsageWindow    bool                       `json:"credit_skip_usage_window"`
 	AccountType              string                     `json:"account_type,omitempty"`
@@ -503,6 +505,9 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	accounts := make([]accountResponse, 0, len(rows))
 	for _, row := range rows {
 		isOpenAIResponsesAccount := strings.EqualFold(strings.TrimSpace(row.GetCredential("upstream_type")), auth.UpstreamOpenAIResponses)
+		hasRefreshToken := row.GetCredential("refresh_token") != ""
+		hasSessionToken := row.GetCredential("session_token") != ""
+		hasAccessToken := row.GetCredential("access_token") != ""
 		email := row.GetCredential("email")
 		baseURL := row.GetCredential("base_url")
 		if isOpenAIResponsesAccount && email == "" {
@@ -519,7 +524,9 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 			PlanType:                 planType,
 			Status:                   row.Status,
 			ErrorMessage:             row.ErrorMessage,
-			ATOnly:                   !isOpenAIResponsesAccount && row.GetCredential("refresh_token") == "" && row.GetCredential("access_token") != "",
+			ATOnly:                   !isOpenAIResponsesAccount && !hasRefreshToken && !hasSessionToken && hasAccessToken,
+			HasRefreshToken:          hasRefreshToken,
+			HasSessionToken:          hasSessionToken,
 			CreditEnabled:            row.CreditEnabled,
 			CreditSkipUsageWindow:    row.CreditSkipUsageWindow,
 			AccountType:              row.Type,
