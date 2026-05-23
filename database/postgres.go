@@ -3252,7 +3252,7 @@ func (db *DB) UpdateAccountSchedulerConfig(ctx context.Context, id int64, scoreB
 
 // UpdateAccountSchedulerMetadata applies scheduler overrides and UI metadata in
 // one transaction. Runtime store updates should happen only after this returns.
-func (db *DB) UpdateAccountSchedulerMetadata(ctx context.Context, id int64, scoreBiasOverride OptionalNullInt64, baseConcurrencyOverride OptionalNullInt64, allowedAPIKeyIDs OptionalInt64Slice, tags OptionalStringSlice, groupIDs OptionalInt64Slice, proxyURL OptionalString) error {
+func (db *DB) UpdateAccountSchedulerMetadata(ctx context.Context, id int64, scoreBiasOverride OptionalNullInt64, baseConcurrencyOverride OptionalNullInt64, allowedAPIKeyIDs OptionalInt64Slice, tags OptionalStringSlice, groupIDs OptionalInt64Slice, proxyURL OptionalString, planType OptionalString) error {
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -3273,8 +3273,8 @@ func (db *DB) UpdateAccountSchedulerMetadata(ctx context.Context, id int64, scor
 		return err
 	}
 
-	sets := make([]string, 0, 6)
-	args := make([]interface{}, 0, 8)
+	sets := make([]string, 0, 7)
+	args := make([]interface{}, 0, 9)
 	add := func(column string, value interface{}) {
 		args = append(args, value)
 		ph := "?"
@@ -3300,10 +3300,15 @@ func (db *DB) UpdateAccountSchedulerMetadata(ctx context.Context, id int64, scor
 	if proxyURL.Set {
 		add("proxy_url", strings.TrimSpace(proxyURL.Value))
 	}
+	credentialUpdates := make(map[string]interface{})
 	if allowedAPIKeyIDs.Set {
-		merged := mergeCredentialMaps(decodeCredentials(currentRaw), map[string]interface{}{
-			"allowed_api_key_ids": normalizePositiveInt64Slice(allowedAPIKeyIDs.Values),
-		})
+		credentialUpdates["allowed_api_key_ids"] = normalizePositiveInt64Slice(allowedAPIKeyIDs.Values)
+	}
+	if planType.Set {
+		credentialUpdates["plan_type"] = strings.TrimSpace(planType.Value)
+	}
+	if len(credentialUpdates) > 0 {
+		merged := mergeCredentialMaps(decodeCredentials(currentRaw), credentialUpdates)
 		credJSON, err := json.Marshal(merged)
 		if err != nil {
 			return fmt.Errorf("序列化 credentials 失败: %w", err)

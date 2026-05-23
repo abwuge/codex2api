@@ -692,6 +692,55 @@ func TestUpdateAccountSchedulerPersistsAllowedAPIKeyIDs(t *testing.T) {
 	}
 }
 
+func TestUpdateAccountSchedulerPersistsPlanType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestAdminDB(t)
+	accountID := insertTestAccount(t, db)
+	handler := &Handler{db: db}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", accountID)}}
+	ctx.Request = httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/admin/accounts/%d/scheduler", accountID), strings.NewReader(`{"plan_type":"Plus"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.UpdateAccountScheduler(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	rows, err := db.ListActive(context.Background())
+	if err != nil {
+		t.Fatalf("ListActive: %v", err)
+	}
+	if got := rows[0].GetCredential("plan_type"); got != "plus" {
+		t.Fatalf("plan_type = %q, want plus", got)
+	}
+}
+
+func TestUpdateAccountSchedulerRejectsInvalidPlanType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestAdminDB(t)
+	accountID := insertTestAccount(t, db)
+	handler := &Handler{db: db}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", accountID)}}
+	ctx.Request = httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/admin/accounts/%d/scheduler", accountID), strings.NewReader(`{"plan_type":"plus!"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.UpdateAccountScheduler(ctx)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	assertErrorMessage(t, recorder, "plan_type 只能包含小写字母、数字、下划线或连字符")
+}
+
 func TestUpdateAccountSchedulerResetsToAutoOnNull(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

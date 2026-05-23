@@ -152,6 +152,7 @@ export interface UpdateAccountSchedulerRequest {
   proxy_url?: string | null
   tags?: string[] | null
   group_ids?: number[] | null
+  plan_type?: string | null
 }
 
 export interface AccountGroup {

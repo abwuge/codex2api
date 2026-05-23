@@ -106,6 +106,18 @@ const ACCOUNT_GROUP_COLORS = [
   "#0891b2",
   "#64748b",
 ] as const;
+const ACCOUNT_PLAN_OPTIONS = [
+  { value: "free", label: "Free" },
+  { value: "plus", label: "Plus" },
+  { value: "pro", label: "Pro" },
+  { value: "prolite", label: "ProLite" },
+  { value: "team", label: "Team" },
+  { value: "teamplus", label: "Team Plus" },
+  { value: "enterprise", label: "Enterprise" },
+  { value: "business", label: "Business" },
+  { value: "edu", label: "Edu" },
+  { value: "api", label: "API" },
+] as const;
 type AccountTableColumn = (typeof ACCOUNT_TABLE_COLUMNS)[number];
 type AccountGroupDraft = {
   id: number | null;
@@ -309,6 +321,7 @@ export default function Accounts() {
     number[]
   >([]);
   const [editProxyUrl, setEditProxyUrl] = useState("");
+  const [editPlanType, setEditPlanType] = useState("");
   const [editOpenAIForm, setEditOpenAIForm] =
     useState<UpdateOpenAIResponsesAccountRequest>({
       name: "",
@@ -1837,6 +1850,7 @@ export default function Accounts() {
       filterExistingAPIKeyIDs(account.allowed_api_key_ids ?? [], apiKeys),
     );
     setEditProxyUrl(account.proxy_url ?? "");
+    setEditPlanType((account.plan_type || "").toLowerCase().trim());
     setEditTags(account.tags ?? []);
     setEditGroupIds(account.group_ids ?? []);
     setEditOpenAIForm({
@@ -1859,6 +1873,7 @@ export default function Accounts() {
     setConcurrencyInput("");
     setAllowedAPIKeySelection([]);
     setEditProxyUrl("");
+    setEditPlanType("");
     setEditTags([]);
     setEditGroupIds([]);
     setEditOpenAIForm({
@@ -1890,6 +1905,22 @@ export default function Accounts() {
     editTab === "account" &&
     (!editOpenAIForm.base_url.trim() || editOpenAIForm.models.length === 0),
   );
+  const planTypeOptions = useMemo(() => {
+    const options = [
+      { value: "", label: t("accounts.planUnset") },
+      ...ACCOUNT_PLAN_OPTIONS,
+    ];
+    if (
+      editPlanType &&
+      !options.some((option) => option.value === editPlanType)
+    ) {
+      return [
+        ...options,
+        { value: editPlanType, label: formatPlanLabel(editPlanType) },
+      ];
+    }
+    return options;
+  }, [editPlanType, t]);
 
   const editPreview = useMemo(() => {
     if (!editingAccount) return null;
@@ -1898,7 +1929,7 @@ export default function Accounts() {
     const appliedBias =
       scoreMode === "custom"
         ? (parsedScoreBias ?? getEffectiveScoreBias(editingAccount))
-        : getDefaultScoreBias(editingAccount.plan_type);
+        : getDefaultScoreBias(editPlanType);
     const baseConcurrency =
       concurrencyMode === "custom"
         ? (parsedBaseConcurrency ?? getEffectiveBaseConcurrency(editingAccount))
@@ -1921,6 +1952,7 @@ export default function Accounts() {
     };
   }, [
     editingAccount,
+    editPlanType,
     scoreMode,
     parsedScoreBias,
     concurrencyMode,
@@ -1944,6 +1976,7 @@ export default function Accounts() {
         proxy_url: editProxyUrl.trim() || null,
         tags: editTags,
         group_ids: editGroupIds,
+        plan_type: editPlanType || null,
       };
       await api.updateAccountScheduler(editingAccount.id, payload);
       showToast(t("accounts.schedulerSaveSuccess"));
@@ -3941,7 +3974,7 @@ export default function Accounts() {
                   </div>
                   <div className="mt-1">
                     {t("accounts.schedulerEditDesc", {
-                      plan: editingAccount.plan_type || "-",
+                      plan: editPlanType || "-",
                     })}
                   </div>
                   <div className="mt-2 text-xs">
@@ -4112,6 +4145,27 @@ export default function Accounts() {
                   </div>
                 ) : (
                   <>
+                    <div className="rounded-xl border border-border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-foreground">
+                            {t("accounts.planTypeLabel")}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {t("accounts.planTypeHint")}
+                          </div>
+                        </div>
+                        <div className="flex w-full items-center gap-3 sm:w-64">
+                          <Select
+                            value={editPlanType}
+                            onValueChange={setEditPlanType}
+                            options={planTypeOptions}
+                          />
+                          <PlanBadge planType={editPlanType} />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="rounded-xl border border-border p-4">
                         <div className="text-sm font-semibold text-foreground">
@@ -4136,7 +4190,7 @@ export default function Accounts() {
                           <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
                             {t("accounts.schedulerScoreAutoValue", {
                               value: formatSignedNumber(
-                                getDefaultScoreBias(editingAccount.plan_type),
+                                getDefaultScoreBias(editPlanType),
                               ),
                             })}
                           </div>

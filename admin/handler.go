@@ -684,6 +684,7 @@ type updateAccountSchedulerReq struct {
 	Tags                    json.RawMessage `json:"tags"`
 	GroupIDs                json.RawMessage `json:"group_ids"`
 	ProxyURL                *string         `json:"proxy_url"`
+	PlanType                json.RawMessage `json:"plan_type"`
 }
 
 // UpdateAccountScheduler 更新账号调度配置。
@@ -766,6 +767,11 @@ func (h *Handler) UpdateAccountScheduler(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	planType, err := parseOptionalPlanTypeField(req.PlanType)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
@@ -805,7 +811,7 @@ func (h *Handler) UpdateAccountScheduler(c *gin.Context) {
 	if req.ProxyURL != nil {
 		proxyURL = database.OptionalString{Set: true, Value: *req.ProxyURL}
 	}
-	if err := h.db.UpdateAccountSchedulerMetadata(ctx, id, scoreBiasOverride, baseConcurrencyOverride, allowedAPIKeyIDs, database.OptionalStringSlice{Set: tags.Set, Values: tags.Values}, groupIDs, proxyURL); err != nil {
+	if err := h.db.UpdateAccountSchedulerMetadata(ctx, id, scoreBiasOverride, baseConcurrencyOverride, allowedAPIKeyIDs, database.OptionalStringSlice{Set: tags.Set, Values: tags.Values}, groupIDs, proxyURL, planType); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(c, http.StatusNotFound, "账号不存在")
 			return
@@ -851,6 +857,9 @@ func (h *Handler) UpdateAccountScheduler(c *gin.Context) {
 	if h.store != nil && req.ProxyURL != nil {
 		h.store.ApplyAccountProxyURL(id, *req.ProxyURL)
 	}
+	if h.store != nil && planType.Set {
+		h.store.ApplyAccountPlanType(id, planType.Value)
+	}
 
 	writeMessage(c, http.StatusOK, "账号调度配置已更新")
 }
@@ -892,6 +901,33 @@ func parseOptionalStringSliceField(raw json.RawMessage, field string) (optionalS
 		return optionalStringSlice{}, fmt.Errorf("%s 最多 32 个标签", field)
 	}
 	return optionalStringSlice{Set: true, Values: out}, nil
+}
+
+func parseOptionalPlanTypeField(raw json.RawMessage) (database.OptionalString, error) {
+	if len(raw) == 0 {
+		return database.OptionalString{}, nil
+	}
+	if string(raw) == "null" {
+		return database.OptionalString{Set: true, Value: ""}, nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return database.OptionalString{}, fmt.Errorf("plan_type 必须是字符串或 null")
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return database.OptionalString{Set: true, Value: ""}, nil
+	}
+	if utf8.RuneCountInString(value) > 32 {
+		return database.OptionalString{}, fmt.Errorf("plan_type 不能超过 32 字符")
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			continue
+		}
+		return database.OptionalString{}, fmt.Errorf("plan_type 只能包含小写字母、数字、下划线或连字符")
+	}
+	return database.OptionalString{Set: true, Value: value}, nil
 }
 
 func parseOptionalIntegerField(raw json.RawMessage, field string, minValue, maxValue int64) (database.OptionalNullInt64, error) {

@@ -3321,6 +3321,19 @@ func (s *Store) ApplyAccountGroups(dbID int64, groupIDs []int64) bool {
 	return true
 }
 
+func (s *Store) ApplyAccountPlanType(dbID int64, planType string) bool {
+	acc := s.FindByID(dbID)
+	if acc == nil {
+		return false
+	}
+	acc.mu.Lock()
+	acc.PlanType = strings.TrimSpace(planType)
+	acc.recomputeSchedulerLocked(atomic.LoadInt64(&s.maxConcurrency))
+	acc.mu.Unlock()
+	s.fastSchedulerUpdate(acc)
+	return true
+}
+
 // UpdateAccountCredit 更新账号信用设置
 // 传入 nil 表示不修改该字段。
 func (s *Store) UpdateAccountCredit(dbID int64, creditEnabled, creditSkipUsageWindow *bool) error {
